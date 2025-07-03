@@ -1,7 +1,13 @@
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from flask import Flask, request
+import os
 
 TOKEN = "7951239927:AAEZss5G4Qa0RL5fTh4c94j6DZARJwTvmhs"
+WEBHOOK_URL = "https://your-app-name.onrender.com"
+
+app = Flask(__name__)
+telegram_app = ApplicationBuilder().token(TOKEN).build()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_first_name = update.effective_user.first_name
@@ -24,11 +30,21 @@ async def vedicmath(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def abacus(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔢 Abacus training content coming soon.")
 
-app = ApplicationBuilder().token(TOKEN).build()
+telegram_app.add_handler(CommandHandler("start", start))
+telegram_app.add_handler(CommandHandler("help", help_command))
+telegram_app.add_handler(CommandHandler("vedicmath", vedicmath))
+telegram_app.add_handler(CommandHandler("abacus", abacus))
 
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("help", help_command))
-app.add_handler(CommandHandler("vedicmath", vedicmath))
-app.add_handler(CommandHandler("abacus", abacus))
+@app.route(f'/7951239927:AAEZss5G4Qa0RL5fTh4c94j6DZARJwTvmhs', methods=["POST"])
+async def webhook():
+    await telegram_app.update_queue.put(Update.de_json(request.get_json(force=True), telegram_app.bot))
+    return "ok"
 
-app.run_polling()
+@app.before_first_request
+def set_webhook():
+    from telegram import Bot
+    bot = Bot(token=TOKEN)
+    bot.set_webhook(url=f"{WEBHOOK_URL}/7951239927:AAEZss5G4Qa0RL5fTh4c94j6DZARJwTvmhs")
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)
