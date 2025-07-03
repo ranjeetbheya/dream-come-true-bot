@@ -1,20 +1,23 @@
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from flask import Flask, request
+from telegram import Bot, Update
+from telegram.ext import CommandHandler, Dispatcher, CallbackContext
 import os
 
+# === CONFIGURATION ===
 TOKEN = "7951239927:AAEZss5G4Qa0RL5fTh4c94j6DZARJwTvmhs"
-WEBHOOK_URL = "https://your-app-name.onrender.com"
+WEBHOOK_URL = "https://your-app-name.onrender.com"  # Change this to your Render live URL
 
+# === SETUP ===
 app = Flask(__name__)
-telegram_app = ApplicationBuilder().token(TOKEN).build()
+bot = Bot(token=TOKEN)
+dispatcher = Dispatcher(bot=bot, update_queue=None, use_context=True)
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_first_name = update.effective_user.first_name
-    welcome_text = f"🙏 Welcome {user_first_name}! I'm Ranjeet Bhaiya - Your Career Guide. 🚀\n\nType /help to explore all features."
-    await update.message.reply_text(welcome_text)
+# === HANDLERS ===
+def start(update: Update, context: CallbackContext):
+    user = update.effective_user.first_name
+    update.message.reply_text(f"🙏 Welcome {user}! I'm Ranjeet Bhaiya - Your Career Guide. 🚀\n\nType /help to explore all features.")
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def help_command(update: Update, context: CallbackContext):
     help_text = (
         "Here are some things you can do:\n"
         "/start - Begin your journey\n"
@@ -22,29 +25,35 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/abacus - Improve your mental calculation\n"
         "/ask - Ask any career/study question"
     )
-    await update.message.reply_text(help_text)
+    update.message.reply_text(help_text)
 
-async def vedicmath(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🧠 Vedic Math Tips Coming Soon! Stay tuned.")
+def vedicmath(update: Update, context: CallbackContext):
+    update.message.reply_text("🧠 Vedic Math Tips Coming Soon! Stay tuned.")
 
-async def abacus(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔢 Abacus training content coming soon.")
+def abacus(update: Update, context: CallbackContext):
+    update.message.reply_text("🔢 Abacus training content coming soon.")
 
-telegram_app.add_handler(CommandHandler("start", start))
-telegram_app.add_handler(CommandHandler("help", help_command))
-telegram_app.add_handler(CommandHandler("vedicmath", vedicmath))
-telegram_app.add_handler(CommandHandler("abacus", abacus))
+# === Register Handlers ===
+dispatcher.add_handler(CommandHandler("start", start))
+dispatcher.add_handler(CommandHandler("help", help_command))
+dispatcher.add_handler(CommandHandler("vedicmath", vedicmath))
+dispatcher.add_handler(CommandHandler("abacus", abacus))
 
-@app.route(f'/7951239927:AAEZss5G4Qa0RL5fTh4c94j6DZARJwTvmhs', methods=["POST"])
-async def webhook():
-    await telegram_app.update_queue.put(Update.de_json(request.get_json(force=True), telegram_app.bot))
+# === Webhook route ===
+@app.route(f"/{TOKEN}", methods=["POST"])
+def webhook():
+    update = Update.de_json(request.get_json(force=True), bot)
+    dispatcher.process_update(update)
     return "ok"
 
-@app.before_first_request
+# === Set webhook before first request ===
+@app.before_request
 def set_webhook():
-    from telegram import Bot
-    bot = Bot(token=TOKEN)
-    bot.set_webhook(url=f"{WEBHOOK_URL}/7951239927:AAEZss5G4Qa0RL5fTh4c94j6DZARJwTvmhs")
+    bot.set_webhook(f"{WEBHOOK_URL}/{TOKEN}")
+
+@app.route("/", methods=["GET"])
+def index():
+    return "Bot is live and running!"
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
